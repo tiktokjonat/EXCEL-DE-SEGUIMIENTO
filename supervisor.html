@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Supervisor - Academia Geincos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .alert-box {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: white; padding: 15px 25px; border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); display: none;
+            flex-direction: column; gap: 15px; z-index: 9999; min-width: 300px;
+        }
+        .alert-box.error { border-top: 4px solid #ef4444; }
+        .alert-box.success { border-top: 4px solid #10b981; }
+        .alert-box button {
+            background: #5a4b81; color: white; border: none; padding: 8px 25px;
+            border-radius: 20px; cursor: pointer; align-self: flex-end; font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans leading-normal tracking-normal h-screen overflow-hidden">
+
+    <div class="alert-box" id="custom-alert">
+        <div><strong id="alert-title">Esta página dice</strong></div>
+        <div id="alert-message" class="text-sm text-gray-700">Mensaje</div>
+        <button onclick="closeAlert()">Aceptar</button>
+    </div>
+
+    <div id="mainApp" class="h-screen flex flex-col">
+        <nav class="bg-blue-900 p-4 shadow-lg text-white flex justify-between items-center flex-shrink-0 border-b-4 border-yellow-400">
+            <div class="font-bold text-xl flex items-center gap-2">
+                <i class="fas fa-user-shield text-yellow-400"></i> Centro de Mando Geincos
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-3 border-l pl-4 ml-2 border-blue-700">
+                    <div class="text-right">
+                        <div id="navUserName" class="font-bold text-sm">Cargando...</div>
+                        <div id="navUserRole" class="text-xs text-yellow-400 font-bold uppercase">SUPERVISOR</div>
+                    </div>
+                    <button onclick="cerrarSesion()" class="bg-red-600 hover:bg-red-700 p-2 rounded shadow" title="Salir">
+                        <i class="fas fa-power-off"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="flex flex-col md:flex-row flex-1 overflow-hidden">
+            <div class="bg-gray-800 text-white w-full md:w-64 flex-shrink-0 overflow-y-auto">
+                <ul class="flex flex-col py-4">
+                    <li class="px-6 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Análisis Global</li>
+                    <li><button onclick="changeTab('dashboard')" class="w-full text-left px-6 py-3 hover:bg-gray-700 flex items-center gap-3"><i class="fas fa-chart-pie text-blue-400 w-5"></i> Resumen de Equipo</button></li>
+                    <li><button onclick="changeTab('lista')" class="w-full text-left px-6 py-3 hover:bg-gray-700 flex items-center gap-3"><i class="fas fa-users text-emerald-400 w-5"></i> Cartera Global</button></li>
+                    <li><button onclick="changeTab('reporte')" class="w-full text-left px-6 py-3 hover:bg-gray-700 flex items-center gap-3"><i class="fas fa-calendar-check text-purple-400 w-5"></i> Reporte Histórico</button></li>
+                </ul>
+            </div>
+
+            <div class="flex-1 p-6 overflow-y-auto bg-gray-100 flex flex-col">
+                
+                <div class="bg-white p-4 rounded-lg shadow mb-6 flex flex-wrap gap-4 items-end border-l-4 border-blue-600">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1"><i class="fas fa-user-tie"></i> Filtro de Asesor</label>
+                        <select id="filtroAsesorGlobal" class="border rounded px-3 py-2 text-sm font-bold text-blue-900 bg-blue-50 focus:ring-blue-500 min-w-[200px]" onchange="actualizarPantallas()">
+                            <option value="TODOS">Todos mis Asesores</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1"><i class="fas fa-calendar-alt"></i> Desde</label>
+                        <input type="date" id="filtroGlobalInicio" class="border rounded px-3 py-2 text-sm focus:ring-blue-500" onchange="actualizarPantallas()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1"><i class="fas fa-calendar-alt"></i> Hasta</label>
+                        <input type="date" id="filtroGlobalFin" class="border rounded px-3 py-2 text-sm focus:ring-blue-500" onchange="actualizarPantallas()">
+                    </div>
+                    <button onclick="limpiarFiltros()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm text-sm font-bold transition"><i class="fas fa-eraser"></i> Limpiar</button>
+                    
+                    <button onclick="exportarExcelPuro()" class="ml-auto bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow-md text-sm font-bold transition flex items-center gap-2">
+                        <i class="fas fa-file-excel"></i> Exportar Data a Excel
+                    </button>
+                </div>
+
+                <div id="dashboard" class="tab-content active">
+                    <h2 class="text-2xl font-bold mb-4 text-gray-800">Rendimiento Consolidado</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white p-5 rounded-lg shadow border-b-4 border-blue-500">
+                            <div class="text-gray-500 text-sm font-bold uppercase">Negociaciones</div>
+                            <div class="text-3xl font-bold text-gray-800 my-1" id="kpiNegociaciones">0</div>
+                            <div class="text-sm text-blue-600 font-bold bg-blue-50 inline-block px-2 py-1 rounded">S/. <span id="montoNegociacion">0.00</span></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-lg shadow border-b-4 border-purple-500">
+                            <div class="text-gray-500 text-sm font-bold uppercase">Posibles</div>
+                            <div class="text-3xl font-bold text-gray-800 my-1" id="kpiPosibles">0</div>
+                            <div class="text-sm text-purple-600 font-bold bg-purple-50 inline-block px-2 py-1 rounded">S/. <span id="montoPosibles">0.00</span></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-lg shadow border-b-4 border-yellow-500">
+                            <div class="text-gray-500 text-sm font-bold uppercase">Agendados/PDP</div>
+                            <div class="text-3xl font-bold text-gray-800 my-1" id="kpiAgendados">0</div>
+                            <div class="text-sm text-yellow-600 font-bold bg-yellow-50 inline-block px-2 py-1 rounded">S/. <span id="montoAgendados">0.00</span></div>
+                        </div>
+                        <div class="bg-white p-5 rounded-lg shadow border-b-4 border-emerald-500">
+                            <div class="text-gray-500 text-sm font-bold uppercase">Cancelos (Éxito)</div>
+                            <div class="text-3xl font-bold text-emerald-600 my-1" id="kpiCancelos">0</div>
+                            <div class="text-sm text-emerald-700 font-bold bg-emerald-50 inline-block px-2 py-1 rounded">S/. <span id="montoCancelos">0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="lista" class="tab-content flex-1">
+                    <div class="bg-white p-6 rounded-lg shadow overflow-x-auto h-full">
+                        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4 border-b pb-4">
+                            <h2 class="text-xl font-bold text-gray-800">Cartera Detallada</h2>
+                            
+                            <div class="flex-1 w-full md:w-auto">
+                                <div class="text-xs font-bold text-gray-500 mb-1 uppercase">Filtrar por Estados en Tabla</div>
+                                <div id="multiSelectFiltros" class="flex flex-wrap gap-2 text-sm">
+                                    <label class="bg-gray-100 hover:bg-blue-50 border px-3 py-1 rounded cursor-pointer select-none"><input type="checkbox" value="NEGOCIACION" checked onchange="actualizarPantallas()"> Negociación</label>
+                                    <label class="bg-gray-100 hover:bg-blue-50 border px-3 py-1 rounded cursor-pointer select-none"><input type="checkbox" value="POSIBLES" checked onchange="actualizarPantallas()"> Posibles</label>
+                                    <label class="bg-gray-100 hover:bg-blue-50 border px-3 py-1 rounded cursor-pointer select-none"><input type="checkbox" value="AGENDADO" checked onchange="actualizarPantallas()"> Agendado</label>
+                                    <label class="bg-gray-100 hover:bg-blue-50 border px-3 py-1 rounded cursor-pointer select-none"><input type="checkbox" value="PROMESA DE PAGO" checked onchange="actualizarPantallas()"> PDP</label>
+                                    <label class="bg-gray-100 hover:bg-blue-50 border px-3 py-1 rounded cursor-pointer select-none"><input type="checkbox" value="CANCELO" checked onchange="actualizarPantallas()"> Canceló</label>
+                                </div>
+                            </div>
+                            <input type="text" id="buscador" placeholder="Buscar por DNI o Nombre..." class="border rounded px-3 py-2 text-sm w-full md:w-64" oninput="actualizarPantallas()">
+                        </div>
+
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr class="text-xs uppercase font-bold text-gray-500">
+                                    <th class="px-4 py-3 text-left bg-blue-50 text-blue-900 border-b-2 border-blue-200">Asesor a Cargo</th>
+                                    <th class="px-4 py-3 text-left">DNI</th>
+                                    <th class="px-4 py-3 text-left">Cliente</th>
+                                    <th class="px-4 py-3 text-left">Contacto</th>
+                                    <th class="px-4 py-3 text-center">Status</th>
+                                    <th class="px-4 py-3 text-left">Monto</th>
+                                    <th class="px-4 py-3 text-left">Agendado</th>
+                                    <th class="px-4 py-3 text-center">Llamadas</th>
+                                    <th class="px-4 py-3 text-center">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaClientes" class="bg-white divide-y divide-gray-200 text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div id="reporte" class="tab-content">
+                    <div class="bg-white p-6 rounded-lg shadow overflow-x-auto">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-800"><i class="fas fa-calendar-check text-blue-600"></i> Productividad Diaria</h2>
+                                <p class="text-sm text-gray-500">Congelamiento de estados por día (Histórico Real).</p>
+                            </div>
+                            <button onclick="exportarReporteExcel()" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded shadow text-sm font-bold flex items-center gap-2">
+                                <i class="fas fa-file-excel"></i> Descargar Histórico
+                            </button>
+                        </div>
+                        
+                        <table class="min-w-full divide-y divide-gray-200 border text-sm" id="tablaReporteExcel">
+                            <thead class="bg-blue-50" id="reporte-head"></thead>
+                            <tbody id="reporte-body" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div id="modalEditar" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-[150] p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold">Actualizar Gestión (Supervisor)</h3>
+                <button onclick="cerrarModalEditar()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="formEditar" class="space-y-4">
+                <input type="hidden" id="editIndex">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-500 uppercase">DNI Cliente</label><input type="text" id="editDni" class="w-full border p-2 rounded bg-gray-100 font-bold text-gray-600" readonly></div>
+                    <div><label class="text-xs font-bold uppercase">Nombre</label><input type="text" id="editNombre" class="w-full border p-2 rounded"></div>
+                    <div><label class="text-xs font-bold uppercase">Celular</label><input type="text" id="editTelefono" class="w-full border p-2 rounded"></div>
+                    <div><label class="text-xs font-bold uppercase">Monto Actual</label><input type="number" id="editMonto" step="0.01" class="w-full border p-2 rounded"></div>
+                    <div><label class="text-xs font-bold uppercase text-blue-700">Nuevo Estado</label>
+                        <select id="editStatus" class="w-full border p-2 rounded bg-yellow-50 font-bold">
+                            <option value="NEGOCIACION">Negociación</option>
+                            <option value="POSIBLES">Posibles</option>
+                            <option value="AGENDADO">Agendado</option>
+                            <option value="PROMESA DE PAGO">Promesa de Pago (PDP)</option>
+                            <option value="CANCELO">Canceló</option>
+                        </select>
+                    </div>
+                    <div><label class="text-xs font-bold uppercase">Fecha Recordatorio</label><input type="date" id="editFecha" class="w-full border p-2 rounded"></div>
+                    <div><label class="text-xs font-bold uppercase">Hora Recordatorio</label><input type="time" id="editHora" class="w-full border p-2 rounded"></div>
+                </div>
+                <div class="border-t pt-4 mt-2">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-xs font-bold uppercase">Observaciones</label>
+                        <button type="button" onclick="sumarLlamada()" class="text-xs bg-blue-100 text-blue-700 px-3 py-1 rounded font-bold hover:bg-blue-200 transition">+ Añadir Nota Supervisor</button>
+                    </div>
+                    <textarea id="editObservaciones" rows="4" class="w-full border p-2 rounded text-sm bg-yellow-50"></textarea>
+                    <input type="hidden" id="editLlamadas">
+                </div>
+                <div class="flex justify-end gap-2 mt-4">
+                    <button type="button" onclick="cerrarModalEditar()" class="bg-gray-400 hover:bg-gray-500 text-white px-4 py-2 rounded font-bold transition">Cancelar</button>
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 rounded font-bold transition shadow-md">Actualizar Datos</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="modalHistorial" class="hidden fixed inset-0 bg-gray-900 bg-opacity-50 flex justify-center items-center z-[160] p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <div class="flex justify-between items-center border-b pb-3 mb-4">
+                <h3 class="text-xl font-bold text-gray-800"><i class="fas fa-history text-blue-600"></i> Historial de <span id="historialClienteNombre"></span></h3>
+                <button onclick="cerrarModalHistorial()" class="text-gray-500 hover:text-red-500"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <div class="mb-4 text-sm font-bold text-gray-600 bg-gray-100 p-2 rounded flex justify-between">
+                <span>Total de movimientos:</span>
+                <span id="historialCount" class="text-blue-600 font-extrabold">0</span>
+            </div>
+            
+            <div class="max-h-80 overflow-y-auto p-2" id="historialTimeline">
+                </div>
+            
+            <div class="flex justify-end gap-2 mt-4 pt-3 border-t">
+                <button type="button" onclick="cerrarModalHistorial()" class="bg-blue-900 hover:bg-blue-800 text-white px-6 py-2 rounded font-bold transition">Cerrar Historial</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://nyasoynjywzqodrlijpj.supabase.co'; 
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55YXNveW5qeXd6cW9kcmxpanBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMyNDksImV4cCI6MjA4ODE0OTI0OX0.OQgwRmbno6W2Vmud5jvOrcNQu4KIkLuII1t4JHLfS8w';
+        const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let gestionesGlobales = [];
+        let historialGlobal = [];
+        let currentUser = null;
+
+        function getFechaLocal() {
+            const hoy = new Date();
+            return hoy.getFullYear() + "-" + String(hoy.getMonth()+1).padStart(2,'0') + "-" + String(hoy.getDate()).padStart(2,'0');
+        }
+
+        function getHoraLocal() {
+            return new Date().toLocaleTimeString('es-ES', { hour12: false });
+        }
+
+        window.addEventListener('load', () => {
+            const sessionData = localStorage.getItem('user_session');
+            if(!sessionData) { window.location.href = 'index.html'; return; }
+            
+            currentUser = JSON.parse(sessionData);
+            if(currentUser.rol !== 'SUPERVISOR') {
+                window.location.href = 'asesor.html';
+                return;
+            }
+
+            document.getElementById('navUserName').innerText = currentUser.nombre;
+            cargarDatosSupabase();
+        });
+
+        function showAlert(msg, type = 'error') {
+            const alertBox = document.getElementById('custom-alert');
+            document.getElementById('alert-message').innerText = msg;
+            document.getElementById('alert-title').innerText = (type === 'success') ? "¡Excelente!" : "Aviso del Sistema";
+            alertBox.className = `alert-box flex ${type}`;
+        }
+        function closeAlert() { document.getElementById('custom-alert').style.display = 'none'; }
+
+        async function cargarDatosSupabase() {
+            try {
+                let queryG = db.from('gestiones').select('*').eq('supervisor_equipo', currentUser.id);
+                let queryH = db.from('historial_estados').select('*').eq('supervisor_equipo', currentUser.id);
+
+                const [resG, resH] = await Promise.all([queryG, queryH]);
+
+                if(!resG.error) {
+                    gestionesGlobales = resG.data.map(g => {
+                        if(g.status === 'SEGUIMIENTO') g.status = 'POSIBLES';
+                        return g;
+                    });
+                    
+                    const asesoresNombres = [...new Set(gestionesGlobales.map(g => g.asesor_nombre))].filter(Boolean);
+                    const selectA = document.getElementById('filtroAsesorGlobal');
+                    selectA.innerHTML = '<option value="TODOS">Todos mis Asesores</option>';
+                    asesoresNombres.forEach(nombre => {
+                        selectA.innerHTML += `<option value="${nombre}">${nombre}</option>`;
+                    });
+                }
+                if(!resH.error) {
+                    historialGlobal = resH.data.map(h => {
+                        if(h.status === 'SEGUIMIENTO') h.status = 'POSIBLES';
+                        return h;
+                    });
+                }
+                actualizarPantallas();
+            } catch (err) { console.error("Error BD:", err); }
+        }
+
+        function changeTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            actualizarPantallas();
+        }
+
+        function limpiarFiltros() {
+            document.getElementById('filtroGlobalInicio').value = '';
+            document.getElementById('filtroGlobalFin').value = '';
+            document.getElementById('filtroAsesorGlobal').value = 'TODOS';
+            document.getElementById('buscador').value = '';
+            actualizarPantallas();
+        }
+
+        function actualizarPantallas() {
+            const fechaIni = document.getElementById('filtroGlobalInicio').value;
+            const fechaFin = document.getElementById('filtroGlobalFin').value;
+            const asesorSeleccionado = document.getElementById('filtroAsesorGlobal').value;
+
+            let datosGestiones = gestionesGlobales;
+            if(asesorSeleccionado !== 'TODOS') datosGestiones = datosGestiones.filter(g => g.asesor_nombre === asesorSeleccionado);
+            if(fechaIni) datosGestiones = datosGestiones.filter(g => (g.created_at ? g.created_at.split('T')[0] : g.fecha) >= fechaIni);
+            if(fechaFin) datosGestiones = datosGestiones.filter(g => (g.created_at ? g.created_at.split('T')[0] : g.fecha) <= fechaFin);
+
+            let datosHistorial = historialGlobal;
+            if(fechaIni) datosHistorial = datosHistorial.filter(h => h.fecha_registro >= fechaIni);
+            if(fechaFin) datosHistorial = datosHistorial.filter(h => h.fecha_registro <= fechaFin);
+
+            renderDashboard(datosGestiones);
+            renderTabla(datosGestiones);
+            renderReporte(datosHistorial);
+        }
+
+        function renderDashboard(data) {
+            const negs = data.filter(g => g.status === 'NEGOCIACION');
+            const pos = data.filter(g => g.status === 'POSIBLES');
+            const ags = data.filter(g => g.status === 'AGENDADO' || g.status === 'PROMESA DE PAGO');
+            const cans = data.filter(g => g.status === 'CANCELO');
+
+            document.getElementById('kpiNegociaciones').innerText = negs.length;
+            document.getElementById('kpiPosibles').innerText = pos.length;
+            document.getElementById('kpiAgendados').innerText = ags.length;
+            document.getElementById('kpiCancelos').innerText = cans.length;
+
+            const sumNeg = negs.reduce((acc, c) => acc + parseFloat(c.monto || 0), 0);
+            const sumPos = pos.reduce((acc, c) => acc + parseFloat(c.monto || 0), 0);
+            const sumAg = ags.reduce((acc, c) => acc + parseFloat(c.monto || 0), 0);
+            const sumCan = cans.reduce((acc, c) => acc + parseFloat(c.monto || 0), 0);
+
+            document.getElementById('montoNegociacion').innerText = sumNeg.toFixed(2);
+            document.getElementById('montoPosibles').innerText = sumPos.toFixed(2);
+            document.getElementById('montoAgendados').innerText = sumAg.toFixed(2);
+            document.getElementById('montoCancelos').innerText = sumCan.toFixed(2);
+        }
+
+        function renderTabla(dataBase) {
+            const tbody = document.getElementById('tablaClientes');
+            tbody.innerHTML = '';
+            const busqueda = document.getElementById('buscador').value.toLowerCase();
+            const checkboxes = Array.from(document.querySelectorAll('#multiSelectFiltros input[type="checkbox"]:checked')).map(cb => cb.value);
+
+            let filtrados = dataBase.filter(g => {
+                const coincideTexto = g.dni.includes(busqueda) || (g.nombre || '').toLowerCase().includes(busqueda);
+                const coincideEstado = checkboxes.includes(g.status);
+                return coincideTexto && coincideEstado;
+            });
+
+            filtrados.sort((a,b) => (a.asesor_nombre || '').localeCompare(b.asesor_nombre || ''));
+
+            filtrados.forEach((g) => {
+                let badgeColor = 'bg-gray-100 text-gray-600';
+                if(g.status==='NEGOCIACION') badgeColor = 'bg-blue-100 text-blue-800';
+                if(g.status==='POSIBLES') badgeColor = 'bg-purple-100 text-purple-800';
+                if(g.status==='AGENDADO' || g.status==='PROMESA DE PAGO') badgeColor = 'bg-yellow-100 text-yellow-800';
+                if(g.status==='CANCELO') badgeColor = 'bg-emerald-100 text-emerald-800';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="px-4 py-3 font-bold text-blue-900 bg-blue-50 border-b border-blue-100 uppercase text-xs">${g.asesor_nombre}</td>
+                    <td class="px-4 py-3 font-medium">${g.dni}</td>
+                    <td class="px-4 py-3 font-bold">${g.nombre}</td>
+                    <td class="px-4 py-3">${g.telefono}</td>
+                    <td class="px-4 py-3 text-center"><span class="px-2 py-1 text-[10px] uppercase font-bold rounded ${badgeColor}">${g.status}</span></td>
+                    <td class="px-4 py-3 font-bold text-gray-700">S/. ${parseFloat(g.monto).toFixed(2)}</td>
+                    <td class="px-4 py-3 text-xs text-blue-600 font-bold">${g.fecha || '-'} ${g.hora || ''}</td>
+                    <td class="px-4 py-3 text-center font-bold text-gray-500">${g.llamadas || 1}</td>
+                    <td class="px-4 py-3 text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="verHistorial('${g.id}', '${g.nombre}')" class="bg-indigo-100 hover:bg-indigo-200 text-indigo-700 px-2 py-1 rounded shadow-sm transition" title="Ver Historial"><i class="fas fa-history"></i></button>
+                            <button onclick="abrirModalEditar('${g.id}')" class="bg-yellow-100 hover:bg-yellow-200 text-yellow-700 px-2 py-1 rounded shadow-sm transition" title="Editar"><i class="fas fa-edit"></i></button>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderReporte(datosHistorial) {
+            const thead = document.getElementById('reporte-head');
+            const tbody = document.getElementById('reporte-body');
+            
+            const fechasUnicas = [...new Set(datosHistorial.map(d => d.fecha_registro))].sort();
+            const estadosConfig = ['NEGOCIACION', 'POSIBLES', 'AGENDADO', 'PROMESA DE PAGO', 'CANCELO'];
+
+            let trHead = '<tr><th class="px-4 py-3 text-left font-bold text-blue-900 uppercase">Estado / Etapa</th>';
+            fechasUnicas.forEach(f => {
+                const fechaCorta = f.split('-')[2] + '/' + f.split('-')[1]; 
+                trHead += `<th class="px-4 py-3 text-center font-bold text-gray-600 uppercase border-l">${fechaCorta}</th>`;
+            });
+            trHead += '<th class="px-4 py-3 text-center font-bold text-indigo-700 uppercase border-l bg-indigo-50">Total General</th></tr>';
+            thead.innerHTML = trHead;
+
+            let htmlBody = '';
+            estadosConfig.forEach(est => {
+                let rowTotal = 0;
+                htmlBody += `<tr><td class="px-4 py-3 font-bold text-gray-700">${est}</td>`;
+                
+                fechasUnicas.forEach(f => {
+                    const count = datosHistorial.filter(d => d.status === est && d.fecha_registro === f).length;
+                    rowTotal += count;
+                    const bColor = count > 0 ? 'text-blue-600 font-bold bg-blue-50' : 'text-gray-400';
+                    htmlBody += `<td class="px-4 py-3 text-center border-l ${bColor}">${count}</td>`;
+                });
+                
+                htmlBody += `<td class="px-4 py-3 text-center border-l font-bold text-indigo-700 bg-indigo-50">${rowTotal}</td></tr>`;
+            });
+
+            if(fechasUnicas.length === 0) {
+                htmlBody = `<tr><td colspan="6" class="px-4 py-6 text-center text-gray-500 italic">No hay registros de actividad.</td></tr>`;
+            }
+
+            tbody.innerHTML = htmlBody;
+        }
+
+        // FUNCIONES MODAL EDITAR (CON HISTORIAL)
+        async function abrirModalEditar(id) {
+            const g = gestionesGlobales.find(x => x.id === id);
+            document.getElementById('editIndex').value = g.id;
+            document.getElementById('editDni').value = g.dni; 
+            document.getElementById('editNombre').value = g.nombre;
+            document.getElementById('editTelefono').value = g.telefono;
+            document.getElementById('editMonto').value = g.monto;
+            document.getElementById('editStatus').value = g.status;
+            document.getElementById('editFecha').value = g.fecha;
+            document.getElementById('editHora').value = g.hora;
+            document.getElementById('editObservaciones').value = g.observaciones;
+            document.getElementById('editLlamadas').value = g.llamadas || 1;
+            document.getElementById('modalEditar').classList.remove('hidden');
+        }
+
+        document.getElementById('formEditar').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('editIndex').value;
+            const statusNuevo = document.getElementById('editStatus').value;
+
+            const payload = {
+                nombre: document.getElementById('editNombre').value.toUpperCase(),
+                telefono: document.getElementById('editTelefono').value,
+                monto: document.getElementById('editMonto').value,
+                status: statusNuevo,
+                fecha: document.getElementById('editFecha').value,
+                hora: document.getElementById('editHora').value,
+                observaciones: document.getElementById('observaciones').value,
+                llamadas: parseInt(document.getElementById('editLlamadas').value)
+            };
+
+            const btnSubmit = document.querySelector('#formEditar button[type="submit"]');
+            const textOriginal = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = "Actualizando..."; btnSubmit.disabled = true;
+
+            const { error } = await db.from('gestiones').update(payload).eq('id', id);
+            
+            if(!error) {
+                const hoy = getFechaLocal();
+                const { data: historialPrevio } = await db.from('historial_estados')
+                    .select('id')
+                    .eq('gestion_id', id)
+                    .eq('status', statusNuevo)
+                    .eq('fecha_registro', hoy);
+
+                if (!historialPrevio || historialPrevio.length === 0) {
+                    await db.from('historial_estados').insert([{
+                        gestion_id: id,
+                        asesor_dni: currentUser.dni, // El supervisor también deja su huella si lo edita
+                        supervisor_equipo: currentUser.supervisor_asignado,
+                        status: statusNuevo,
+                        fecha_registro: hoy,
+                        hora_registro: getHoraLocal()
+                    }]);
+                }
+
+                cerrarModalEditar();
+                showAlert("Gestión actualizada correctamente.", "success");
+                cargarDatosSupabase();
+            } else { showAlert("Error al actualizar: " + error.message); }
+
+            btnSubmit.innerHTML = textOriginal; btnSubmit.disabled = false;
+        });
+
+        function sumarLlamada() {
+            const calls = document.getElementById('editLlamadas');
+            const obs = document.getElementById('editObservaciones');
+            calls.value = parseInt(calls.value) + 1;
+            obs.value += `\n\n--- NOTA SUPERVISOR (${new Date().toLocaleString()}) ---\n`;
+            obs.scrollTop = obs.scrollHeight;
+        }
+
+        function cerrarModalEditar() { document.getElementById('modalEditar').classList.add('hidden'); }
+
+        // VER LÍNEA DE TIEMPO (HISTORIAL)
+        function verHistorial(id, nombre) {
+            document.getElementById('historialClienteNombre').innerText = nombre;
+            const timeline = document.getElementById('historialTimeline');
+            
+            let hist = historialGlobal.filter(h => h.gestion_id === id);
+            
+            hist.sort((a, b) => {
+                let dateA = new Date(a.fecha_registro + 'T' + (a.hora_registro || '00:00:00'));
+                let dateB = new Date(b.fecha_registro + 'T' + (b.hora_registro || '00:00:00'));
+                return dateB - dateA;
+            });
+
+            document.getElementById('historialCount').innerText = hist.length;
+            timeline.innerHTML = '';
+
+            if (hist.length === 0) {
+                timeline.innerHTML = '<div class="p-3 text-center text-gray-500 italic">No hay historial registrado.</div>';
+            } else {
+                hist.forEach(h => {
+                    let badgeColor = 'bg-gray-200 text-gray-700';
+                    if(h.status === 'NEGOCIACION') badgeColor = 'bg-blue-100 text-blue-800';
+                    if(h.status === 'POSIBLES') badgeColor = 'bg-purple-100 text-purple-800';
+                    if(h.status === 'AGENDADO' || h.status === 'PROMESA DE PAGO') badgeColor = 'bg-yellow-100 text-yellow-800';
+                    if(h.status === 'CANCELO') badgeColor = 'bg-emerald-100 text-emerald-800';
+
+                    const horaVisual = h.hora_registro ? h.hora_registro.slice(0,5) : '--:--';
+                    
+                    timeline.innerHTML += `
+                        <div class="flex items-center gap-4 mb-4 border-l-2 border-indigo-400 pl-4 ml-2 relative">
+                            <div class="absolute w-3 h-3 bg-indigo-500 rounded-full -left-[7px]"></div>
+                            <div class="text-xs text-gray-500 w-24 font-bold flex flex-col">
+                                <span><i class="far fa-calendar"></i> ${h.fecha_registro}</span>
+                                <span class="text-indigo-600"><i class="far fa-clock"></i> ${horaVisual}</span>
+                            </div>
+                            <div>
+                                <span class="px-3 py-1 text-[10px] uppercase rounded font-bold shadow-sm ${badgeColor}">${h.status}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            
+            document.getElementById('modalHistorial').classList.remove('hidden');
+        }
+
+        function cerrarModalHistorial() { document.getElementById('modalHistorial').classList.add('hidden'); }
+
+
+        // EXPORTACIÓN A EXCEL
+        function exportarExcelPuro() {
+            const fechaIni = document.getElementById('filtroGlobalInicio').value;
+            const fechaFin = document.getElementById('filtroGlobalFin').value;
+            const asesorSeleccionado = document.getElementById('filtroAsesorGlobal').value;
+            const busqueda = document.getElementById('buscador').value.toLowerCase();
+            const checkboxes = Array.from(document.querySelectorAll('#multiSelectFiltros input[type="checkbox"]:checked')).map(cb => cb.value);
+
+            let filtrados = gestionesGlobales;
+            
+            if(asesorSeleccionado !== 'TODOS') filtrados = filtrados.filter(g => g.asesor_nombre === asesorSeleccionado);
+            if(fechaIni) filtrados = filtrados.filter(g => (g.created_at ? g.created_at.split('T')[0] : g.fecha) >= fechaIni);
+            if(fechaFin) filtrados = filtrados.filter(g => (g.created_at ? g.created_at.split('T')[0] : g.fecha) <= fechaFin);
+            
+            filtrados = filtrados.filter(g => {
+                const coincideTexto = g.dni.includes(busqueda) || (g.nombre || '').toLowerCase().includes(busqueda);
+                const coincideEstado = checkboxes.includes(g.status);
+                return coincideTexto && coincideEstado;
+            });
+
+            if (filtrados.length === 0) {
+                return showAlert("No hay datos para exportar con los filtros actuales.", "error");
+            }
+
+            const dataLimpia = filtrados.map(g => ({
+                "Asesor a Cargo": g.asesor_nombre || '',
+                "DNI Cliente": g.dni || '',
+                "Nombre Completo": g.nombre || '',
+                "Teléfono / Celular": g.telefono || '',
+                "Estado Actual": g.status || '',
+                "Monto a Pagar (S/.)": g.monto ? parseFloat(g.monto) : 0,
+                "Fecha de Recordatorio": g.fecha || '',
+                "Hora de Recordatorio": g.hora || '',
+                "N° de Llamadas": g.llamadas || 1,
+                "Observaciones y Sondeo": g.observaciones || ''
+            }));
+
+            let ws = XLSX.utils.json_to_sheet(dataLimpia);
+            let wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Cartera de Clientes");
+            XLSX.writeFile(wb, `Reporte_Geincos_${getFechaLocal()}.xlsx`);
+        }
+
+        function exportarReporteExcel() {
+            let table = document.getElementById("tablaReporteExcel");
+            let wb = XLSX.utils.table_to_book(table, {sheet: "Historial Diario"});
+            XLSX.writeFile(wb, `Productividad_Historica_${getFechaLocal()}.xlsx`);
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('user_session');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

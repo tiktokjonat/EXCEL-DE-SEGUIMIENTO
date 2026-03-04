@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso - Academia Geincos</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root { 
+            --primary: #5850ec; 
+            --primary-hover: #4338ca;
+            --bg-main: #f3f4f6;
+            --text-dark: #1f2937;
+            --text-gray: #6b7280;
+            --border-color: #e5e7eb;
+        }
+        
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0; 
+            background: var(--bg-main); 
+        }
+
+        .split-container {
+            display: flex;
+            width: 900px;
+            max-width: 95%;
+            min-height: 550px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .left-panel {
+            width: 45%;
+            background: linear-gradient(135deg, #667eea 0%, #5850ec 100%);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: -50px;
+            left: -50px;
+            width: 250px;
+            height: 250px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+        .left-panel::after {
+            content: '';
+            position: absolute;
+            bottom: -80px;
+            right: -50px;
+            width: 200px;
+            height: 200px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 50%;
+        }
+
+        .left-panel i.main-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            z-index: 1;
+        }
+
+        .left-panel h1 {
+            font-size: 2.2rem;
+            margin: 0 0 15px 0;
+            font-weight: 800;
+            z-index: 1;
+        }
+
+        .left-panel p {
+            font-size: 1rem;
+            line-height: 1.5;
+            opacity: 0.9;
+            z-index: 1;
+        }
+
+        .right-panel {
+            width: 55%;
+            padding: 50px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: white;
+        }
+
+        .right-panel h2 {
+            color: var(--text-dark);
+            font-size: 1.8rem;
+            margin: 0 0 5px 0;
+        }
+
+        .right-panel p.subtitle {
+            color: var(--text-gray);
+            font-size: 0.95rem;
+            margin-bottom: 25px;
+            margin-top: 0;
+        }
+
+        .input-group {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .input-group i {
+            position: absolute;
+            top: 50%;
+            left: 15px;
+            transform: translateY(-50%);
+            color: #9ca3af;
+        }
+
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 12px 15px 12px 45px; 
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-sizing: border-box;
+            font-size: 0.95rem;
+            color: var(--text-dark);
+            background: #f9fafb;
+            transition: all 0.3s;
+        }
+
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(88, 80, 236, 0.1);
+        }
+
+        button.btn-primary {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            margin-top: 10px;
+            transition: background 0.3s;
+            box-shadow: 0 4px 6px rgba(88, 80, 236, 0.2);
+        }
+
+        button.btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .toggle-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: var(--text-gray);
+        }
+
+        .toggle-link span {
+            color: var(--primary);
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .toggle-link span:hover {
+            text-decoration: underline;
+        }
+
+        .hidden { display: none !important; }
+
+        .alert-box {
+            position: fixed;
+            top: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+            border-left: 5px solid #ef4444;
+        }
+        .alert-box.success { border-left-color: #10b981; }
+        .alert-box button {
+            background: var(--text-dark); 
+            color: white;
+            border: none;
+            padding: 8px 25px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .split-container { flex-direction: column; min-height: auto; }
+            .left-panel { width: 100%; padding: 30px 20px; }
+            .right-panel { width: 100%; padding: 30px 20px; box-sizing: border-box; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="alert-box" id="custom-alert">
+    <div><strong id="alert-title">Atención</strong></div>
+    <div id="alert-message">Mensaje</div>
+    <button onclick="closeAlert()">Aceptar</button>
+</div>
+
+<div class="split-container">
+    
+    <div class="left-panel">
+        <i class="fas fa-graduation-cap main-icon"></i>
+        <h1>Geincos</h1>
+        <p>Plataforma integral de seguimientos de clientes.</p>
+    </div>
+
+    <div class="right-panel">
+        
+        <div id="login-form">
+            <h2>Bienvenido de nuevo</h2>
+            <p class="subtitle">Ingresa tus credenciales para continuar.</p>
+            
+            <div class="input-group">
+                <i class="fas fa-user"></i>
+                <input type="text" id="login-dni" placeholder="Usuario (DNI)">
+            </div>
+            
+            <div class="input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="login-pass" placeholder="Contraseña">
+            </div>
+            
+            <button class="btn-primary" onclick="login()"><i class="fas fa-sign-in-alt"></i> Iniciar Sesión</button>
+            
+            <div class="toggle-link">
+                ¿No tienes cuenta? <span onclick="toggleForm()">Regístrate aquí</span>
+            </div>
+        </div>
+
+        <div id="register-form" class="hidden">
+            <h2>Crear una cuenta</h2>
+            <p class="subtitle">Completa tus datos para registrarte en la plataforma.</p>
+
+            <div class="input-group">
+                <i class="fas fa-id-card"></i>
+                <input type="text" id="reg-nombres" placeholder="Nombres y Apellidos">
+            </div>
+
+            <div class="input-group">
+                <i class="fas fa-passport"></i>
+                <input type="text" id="reg-dni" placeholder="DNI">
+            </div>
+
+            <div class="input-group">
+                <i class="fas fa-lock"></i>
+                <input type="password" id="reg-pass" placeholder="Crear Contraseña">
+            </div>
+            
+            <div class="input-group">
+                <i class="fas fa-user-tie"></i>
+                <select id="reg-perfil" onchange="checkPerfil()">
+                    <option value="asesor">Soy Asesor</option>
+                    <option value="supervisor">Soy Supervisor</option>
+                </select>
+            </div>
+
+            <div class="input-group" id="supervisor-select-container">
+                <i class="fas fa-user-shield"></i>
+                <select id="reg-supervisor-list">
+                    <option value="">Selecciona tu Supervisor</option>
+                </select>
+            </div>
+
+            <button class="btn-primary" onclick="register()"><i class="fas fa-user-plus"></i> Registrarse ahora</button>
+            
+            <div class="toggle-link">
+                ¿Ya tienes cuenta? <span onclick="toggleForm()">Inicia Sesión aquí</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // CONFIGURACIÓN DE SUPABASE
+    const SB_URL = 'https://nyasoynjywzqodrlijpj.supabase.co';
+    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im55YXNveW5qeXd6cW9kcmxpanBqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1NzMyNDksImV4cCI6MjA4ODE0OTI0OX0.OQgwRmbno6W2Vmud5jvOrcNQu4KIkLuII1t4JHLfS8w';
+    const _supabase = window.supabase.createClient(SB_URL, SB_KEY);
+
+    window.onload = () => {
+        checkPerfil(); 
+    };
+
+    function showAlert(msg, isSuccess = false) {
+        const alertBox = document.getElementById('custom-alert');
+        document.getElementById('alert-message').innerText = msg;
+        document.getElementById('alert-title').innerText = isSuccess ? "¡Éxito!" : "Esta página dice";
+        
+        if(isSuccess) {
+            alertBox.classList.add('success');
+        } else {
+            alertBox.classList.remove('success');
+        }
+        
+        alertBox.style.display = 'flex';
+    }
+
+    function closeAlert() {
+        document.getElementById('custom-alert').style.display = 'none';
+    }
+
+    function toggleForm() {
+        document.getElementById('login-form').classList.toggle('hidden');
+        document.getElementById('register-form').classList.toggle('hidden');
+        document.querySelectorAll('input').forEach(i => i.value = '');
+    }
+
+    async function checkPerfil() {
+        const perfil = document.getElementById('reg-perfil').value;
+        const container = document.getElementById('supervisor-select-container');
+        
+        if (perfil === 'asesor') {
+            container.classList.remove('hidden');
+            await loadSupervisores();
+        } else {
+            container.classList.add('hidden');
+            document.getElementById('reg-supervisor-list').value = "";
+        }
+    }
+
+    async function loadSupervisores() {
+        const { data, error } = await _supabase
+            .from('usuarios')
+            .select('id, nombres_apellidos')
+            .eq('perfil', 'supervisor');
+
+        const select = document.getElementById('reg-supervisor-list');
+        select.innerHTML = '<option value="">Selecciona tu Supervisor</option>';
+        
+        if (data && !error) {
+            data.forEach(sup => {
+                const opt = document.createElement('option');
+                opt.value = sup.id;
+                opt.textContent = sup.nombres_apellidos;
+                select.appendChild(opt);
+            });
+        }
+    }
+
+    async function register() {
+        const nombres = document.getElementById('reg-nombres').value.trim();
+        const dni = document.getElementById('reg-dni').value.trim();
+        const pass = document.getElementById('reg-pass').value.trim();
+        const perfil = document.getElementById('reg-perfil').value;
+        const supervisor_id = document.getElementById('reg-supervisor-list').value;
+
+        if(!nombres || !dni || !pass || !perfil) {
+            return showAlert("Completa todos los campos");
+        }
+
+        if(perfil === 'asesor' && !supervisor_id) {
+            return showAlert("Selecciona un supervisor de la lista");
+        }
+
+        const btn = document.querySelector('#register-form button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registrando...';
+        btn.disabled = true;
+
+        const nuevoUsuario = {
+            nombres_apellidos: nombres,
+            dni: dni,
+            password: pass,
+            perfil: perfil
+        };
+
+        if (perfil === 'asesor') {
+            nuevoUsuario.supervisor_id = supervisor_id;
+        }
+
+        const { data, error } = await _supabase.from('usuarios').insert([nuevoUsuario]);
+
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+
+        if (error) {
+            console.error("Error BD:", error);
+            showAlert("Error: " + (error.message.includes("duplicate") ? "El DNI ya está registrado en el sistema." : "Verifica los datos ingresados."));
+        } else {
+            showAlert("¡Registro exitoso! Ya puedes iniciar sesión.", true);
+            toggleForm();
+        }
+    }
+
+    async function login() {
+        const dni = document.getElementById('login-dni').value.trim();
+        const pass = document.getElementById('login-pass').value.trim();
+
+        if(!dni || !pass) {
+            return showAlert("Ingresa DNI y contraseña");
+        }
+
+        const btn = document.querySelector('#login-form button');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validando...';
+        btn.disabled = true;
+
+        try {
+            const { data: user, error } = await _supabase
+                .from('usuarios')
+                .select('*')
+                .eq('dni', dni)
+                .eq('password', pass)
+                .maybeSingle();
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            if (error || !user) {
+                showAlert("DNI o contraseña incorrectos");
+            } else {
+                const sessionData = {
+                    id: user.id,
+                    nombre: user.nombres_apellidos, 
+                    apellido: "", 
+                    dni: user.dni,
+                    rol: user.perfil.toUpperCase(), 
+                    supervisor_asignado: user.supervisor_id 
+                };
+                
+                localStorage.setItem('user_session', JSON.stringify(sessionData));
+                
+                // Validamos el rol para redirigir al panel correspondiente (INCLUYE ADMIN)
+                const perfilNormalizado = user.perfil.toLowerCase();
+                
+                if (perfilNormalizado === 'admin') {
+                    window.location.href = 'admin.html';
+                } else if (perfilNormalizado === 'supervisor') {
+                    window.location.href = 'supervisor.html';
+                } else {
+                    window.location.href = 'asesor.html';
+                }
+            }
+        } catch (err) {
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+            showAlert("Error de conexión con la base de datos.");
+        }
+    }
+
+    // Permitir "Enter" para hacer login
+    document.getElementById('login-pass').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') login();
+    });
+</script>
+
+</body>
+</html>
