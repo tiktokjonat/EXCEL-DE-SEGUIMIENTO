@@ -5,7 +5,7 @@ export const config = {
 
 export default function middleware(request) {
   // 1. Define aquí las IPs públicas autorizadas de tu empresa
-  const ALLOWED_IPS = ['190.102.145.2', ''];
+  const ALLOWED_IPS = ['190.102.145.2', '161.132.182.178'];
 
   // 2. Captura la IP de la persona que intenta entrar
   const clientIp = request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for');
